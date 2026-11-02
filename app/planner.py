@@ -9,7 +9,6 @@ def build_plan(desired_interface, current_interface):
     changes = {}
     # None if the interface does not currently exist.
     if current_interface is None:
-        changes = {}
         for field in managed_fields:
             changes[field] = {"to": desired_interface[field]}
 
