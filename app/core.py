@@ -70,13 +70,13 @@ def validate_request(data):
         return {"status": "error", "result": "missing_interface"}
     # desired.interface.name:  missing_interface_name
     interface = desired["interface"]
-    if not isinstance(interface, dict) or "name" not in interface or not interface["name"]:
+    if not isinstance(interface, dict) or "name" not in interface or not interface["name"] or str(interface["name"]).strip() == "":
         return {"status": "error", "result": "missing_interface_name"}
 
     # 6. For plan and apply only: 
     if action in ("plan", "apply"):
         # missing_ipv4
-        if "ipv4" not in interface or not interface["ipv4"]:
+        if "ipv4" not in interface or not interface["ipv4"] or str(interface["ipv4"]).strip() == "":
             return {"status": "error", "result": "missing_ipv4"}
         # missing_description
         if "description" not in interface or interface["description"] is None:
