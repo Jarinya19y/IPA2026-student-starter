@@ -1,0 +1,11 @@
+fixture: 06-update-only-admin_state.yaml
+
+expected:
+  status: ok
+  result: planned
+  operation: update
+  changes: 
+    admin_state:
+      from: down
+      to: up
+      

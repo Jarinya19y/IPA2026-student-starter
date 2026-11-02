@@ -1,0 +1,13 @@
+fixture: 07-update-many-multiple-mange-field.yaml
+
+expected:
+  status: ok
+  result: planned
+  operation: update
+  changes:
+    description:
+      from: IPA2026-66070321
+      to: IPA2026-66070123
+    admin_state:
+      from: down
+      to: up
