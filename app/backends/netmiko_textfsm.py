@@ -3,8 +3,8 @@ from netmiko import ConnectHandler
 
 
 def _get_credentials():
-    username = os.getenv("ROUTER_USER", "admin")
-    password = os.getenv("ROUTER_PASS", "cisco")
+    username = os.getenv("ROUTER_USER")
+    password = os.getenv("ROUTER_PASS")
     return username, password
 
 

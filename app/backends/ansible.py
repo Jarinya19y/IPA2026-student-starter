@@ -8,8 +8,8 @@ def apply_interface(
     run_playbook=None,
 ):
     """Apply complete desired interface state using Ansible."""
-    username = os.getenv("ROUTER_USER", "admin")
-    password = os.getenv("ROUTER_PASS", "cisco")
+    username = os.getenv("ROUTER_USER")
+    password = os.getenv("ROUTER_PASS")
 
     desired_ipv4 = desired_interface.get("ipv4", "")
     if "/" in desired_ipv4:
