@@ -1,4 +1,6 @@
 import os
+import ipaddress
+
 
 def apply_interface(
     router,
@@ -12,8 +14,9 @@ def apply_interface(
     desired_ipv4 = desired_interface.get("ipv4", "")
     if "/" in desired_ipv4:
         ipv4_addr, prefix_len = desired_ipv4.split("/", 1)
+        netmask = str(ipaddress.IPv4Network(f"0.0.0.0/{prefix_len}").netmask)
     else:
-        ipv4_addr, prefix_len = desired_ipv4, ""
+        ipv4_addr, prefix_len, netmask = desired_ipv4, "", ""
 
     variables = {
         "router": router,
@@ -21,6 +24,7 @@ def apply_interface(
         "ipv4": desired_ipv4,
         "ipv4_address": ipv4_addr,
         "ipv4_prefix_len": prefix_len,
+        "netmask": netmask,
         "description": desired_interface["description"],
         "admin_state": desired_interface["admin_state"],
         "ansible_user": username,

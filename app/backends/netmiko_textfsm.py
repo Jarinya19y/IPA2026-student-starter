@@ -1,15 +1,18 @@
 import os
 from netmiko import ConnectHandler
 
-def _get_auth():
-    username = os.getenv("ROUTER_USER")
-    password = os.getenv("ROUTER_PASS")
-    return (username, password)
+
+def _get_credentials():
+    username = os.getenv("ROUTER_USER", "admin")
+    password = os.getenv("ROUTER_PASS", "cisco")
+    return username, password
+
 
 def _unwrap_val(val):
     if isinstance(val, list):
         return val[0] if len(val) > 0 else ""
     return val if val is not None else ""
+
 
 def get_interface_state(
     router,
@@ -21,7 +24,7 @@ def get_interface_state(
         if netmiko_get is not None:
             ip_info, descriptions = netmiko_get(router, interface_name)
         else:
-            username, password = _get_auth()
+            username, password = _get_credentials()
             device = {
                 "device_type": "cisco_ios",
                 "host": router,
@@ -48,20 +51,21 @@ def get_interface_state(
             parsed_ip.get("prefix_length") or parsed_ip.get("prefix")
         )
 
-        link_state_val = _unwrap_val(
-            parsed_ip.get("link_state")
-            or parsed_ip.get("admin_state")
-            or parsed_ip.get("status")
-            or ""
-        )
+        link_state_raw = str(
+            _unwrap_val(
+                parsed_ip.get("link_state")
+                or parsed_ip.get("admin_state")
+                or parsed_ip.get("status")
+                or ""
+            )
+        ).lower()
 
         if not addr or not prefix:
             return {"status": "ok", "result": "not_found", "interface": None}
 
         ipv4_val = f"{str(addr).strip()}/{str(prefix).strip()}"
 
-        link_str = str(link_state_val).lower()
-        if "down" in link_str or "administratively down" in link_str:
+        if "administratively down" in link_state_raw or "down" in link_state_raw:
             admin_state = "down"
         else:
             admin_state = "up"
@@ -74,6 +78,8 @@ def get_interface_state(
                     p_if = d.get("interface", "")
                     if p_if in (interface_name, short_name):
                         desc_val = d.get("description")
+                        if desc_val == "":
+                            desc_val = None
                         break
 
         return {
@@ -111,7 +117,7 @@ def delete_interface(
             else:
                 return {"status": "error", "result": "backend_failed"}
         else:
-            username, password = _get_auth()
+            username, password = _get_credentials()
             device = {
                 "device_type": "cisco_ios",
                 "host": router,
@@ -163,3 +169,4 @@ def delete_interface(
         return {"status": "error", "result": "connection_failed"}
     except Exception:
         return {"status": "error", "result": "backend_failed"}
+    
