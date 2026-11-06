@@ -90,7 +90,7 @@ class WebexEventHandler:
         if room_id and result:
             try:
                 self.client.send_message(
-                    room_id, json.dumps(result, indent=2)
+                    room_id, json.dumps(result)
                 )
             except Exception as e:
                 logger.error(f"Failed to reply to room {room_id}: {e}")

@@ -22,3 +22,14 @@ services:
       timeout: 10s
       retries: 3
       start_period: 30s
+      
+  # 2. Cloudflare Quick Tunnel Service (เปิด Public HTTPS Endpoint)
+  tunnel:
+    image: cloudflare/cloudflared:latest
+    # ก่อนแก้: command: tunnel --no-autoupdate run --url http://webhook:8000
+    # หลังแก้:
+    command: tunnel --no-autoupdate --url http://webhook:8000
+    restart: unless-stopped
+    depends_on:
+      webhook:
+        condition: service_healthy
