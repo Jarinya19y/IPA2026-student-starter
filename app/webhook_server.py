@@ -3,6 +3,7 @@
 import json
 import logging
 import os
+import tempfile
 from concurrent.futures import ThreadPoolExecutor
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
