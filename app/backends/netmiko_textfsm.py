@@ -1,5 +1,8 @@
 import os
+import logging
 from netmiko import ConnectHandler
+
+logger = logging.getLogger(__name__)
 
 
 def _get_credentials():
@@ -32,14 +35,22 @@ def get_interface_state(
                 "password": password,
             }
             with ConnectHandler(**device) as net_connect:
-                ip_info = net_connect.send_command(
-                    f"show ip interface {interface_name}", use_textfsm=True
-                )
-                descriptions = net_connect.send_command(
-                    "show interfaces description", use_textfsm=True
-                )
+                try:
+                    ip_info = net_connect.send_command(
+                        f"show ip interface {interface_name}", use_textfsm=True
+                    )
+                except Exception:
+                    ip_info = []
 
-        if not ip_info:
+                try:
+                    descriptions = net_connect.send_command(
+                        "show interfaces description", use_textfsm=True
+                    )
+                except Exception:
+                    descriptions = []
+
+        # ถ้า ip_info เป็น string (ไม่ผ่าน TextFSM) หรือเป็น list ว่าง แสดงว่าไม่พบ interface
+        if not isinstance(ip_info, (list, tuple, dict)) or not ip_info:
             return {"status": "ok", "result": "not_found", "interface": None}
 
         parsed_ip = (
@@ -75,7 +86,6 @@ def get_interface_state(
         else:
             admin_state = "up"
 
-        # แกะ Description จาก Fake Runner / TextFSM
         desc_val = None
         short_name = interface_name.replace("Loopback", "Lo")
 
@@ -109,7 +119,8 @@ def get_interface_state(
         return {"status": "error", "result": "authentication_failed"}
     except ConnectionError:
         return {"status": "error", "result": "connection_failed"}
-    except Exception:
+    except Exception as e:
+        logger.error(f"get_interface_state error: {e}")
         return {"status": "error", "result": "backend_failed"}
 
 
@@ -137,18 +148,29 @@ def delete_interface(
                 "password": password,
             }
             with ConnectHandler(**device) as net_connect:
+                # 1. เช็กสถานะเบื้องต้นว่ามี interface นี้หรือไม่
+                def safe_get(r, n):
+                    try:
+                        ip_res = net_connect.send_command(
+                            f"show ip interface {n}", use_textfsm=True
+                        )
+                    except Exception:
+                        ip_res = []
+                    try:
+                        desc_res = net_connect.send_command(
+                            "show interfaces description", use_textfsm=True
+                        )
+                    except Exception:
+                        desc_res = []
+                    return ip_res, desc_res
+
                 status_res = get_interface_state(
                     router,
                     interface_name,
-                    netmiko_get=lambda r, n: (
-                        net_connect.send_command(
-                            f"show ip interface {n}", use_textfsm=True
-                        ),
-                        net_connect.send_command(
-                            "show interfaces description", use_textfsm=True
-                        ),
-                    ),
+                    netmiko_get=safe_get,
                 )
+
+                # ถ้าไม่มี Interface ตั้งแต่แรก ให้คืนค่า not_found (รองรับข้อ 10)
                 if status_res.get("result") == "not_found":
                     return {
                         "status": "ok",
@@ -156,20 +178,16 @@ def delete_interface(
                         "interface": None,
                     }
 
+                # 2. ส่งคำสั่งสั่งลบ Interface
                 net_connect.send_config_set([f"no interface {interface_name}"])
 
+                # 3. เช็กซ้ำอีกครั้งว่า Interface ถูกลบจริงแล้วหรือไม่
                 status_check = get_interface_state(
                     router,
                     interface_name,
-                    netmiko_get=lambda r, n: (
-                        net_connect.send_command(
-                            f"show ip interface {n}", use_textfsm=True
-                        ),
-                        net_connect.send_command(
-                            "show interfaces description", use_textfsm=True
-                        ),
-                    ),
+                    netmiko_get=safe_get,
                 )
+
                 if status_check.get("result") == "not_found":
                     return {"status": "ok", "result": "deleted"}
                 else:
@@ -179,5 +197,6 @@ def delete_interface(
         return {"status": "error", "result": "authentication_failed"}
     except ConnectionError:
         return {"status": "error", "result": "connection_failed"}
-    except Exception:
+    except Exception as e:
+        logger.error(f"delete_interface error: {e}")
         return {"status": "error", "result": "backend_failed"}
