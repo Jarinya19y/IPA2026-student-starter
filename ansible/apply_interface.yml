@@ -1,2 +1,15 @@
 ---
 # TODO: implement the Ansible apply playbook for Part 3.
+- name: Apply Interface Configuration
+  hosts: routers
+  gather_facts: false
+
+  tasks:
+    - name: Configure Loopback Interface State
+      cisco.ios.ios_config:
+        defaults: true
+        lines:
+          - "description {{ description }}"
+          - "ip address {{ ipv4_address }} {{ netmask }}"
+          - "{{ 'shutdown' if shutdown else 'no shutdown' }}"
+        parents: "interface {{ interface_name }}"
