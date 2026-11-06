@@ -72,9 +72,6 @@ def validate_request(data):
     interface = desired["interface"]
     if not isinstance(interface, dict) or "name" not in interface or not interface["name"] or str(interface["name"]).strip() == "":
         return {"status": "error", "result": "missing_interface_name"}
-    if "admin_state" in interface and interface["admin_state"] is not None:
-        if interface["admin_state"] not in ("up", "down"):
-            return {"status": "error", "result": "invalid_admin_state"}
 
     # 6. For plan and apply only: 
     if action in ("plan", "apply"):
