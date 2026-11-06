@@ -1,10 +1,116 @@
+import os
+from netmiko import ConnectHandler
+
+
+def _get_credentials():
+    username = os.getenv("ROUTER_USER", "admin")
+    password = os.getenv("ROUTER_PASS", "cisco")
+    return username, password
+
+
+def _unwrap_val(val):
+    if isinstance(val, (list, tuple)):
+        return val[0] if len(val) > 0 else ""
+    return val if val is not None else ""
+
+
 def get_interface_state(
     router,
     interface_name,
     netmiko_get=None,
 ):
     """Return normalized interface status using Netmiko + TextFSM."""
-    raise NotImplementedError
+    try:
+        if netmiko_get is not None:
+            ip_info, descriptions = netmiko_get(router, interface_name)
+        else:
+            username, password = _get_credentials()
+            device = {
+                "device_type": "cisco_ios",
+                "host": router,
+                "username": username,
+                "password": password,
+            }
+            with ConnectHandler(**device) as net_connect:
+                ip_info = net_connect.send_command(
+                    f"show ip interface {interface_name}", use_textfsm=True
+                )
+                descriptions = net_connect.send_command(
+                    "show interfaces description", use_textfsm=True
+                )
+
+        if not ip_info:
+            return {"status": "ok", "result": "not_found", "interface": None}
+
+        parsed_ip = (
+            ip_info[0] if isinstance(ip_info, (list, tuple)) and len(ip_info) > 0 else (ip_info if isinstance(ip_info, dict) else {})
+        )
+
+        addr = _unwrap_val(parsed_ip.get("ip_address") or parsed_ip.get("ip"))
+        prefix = _unwrap_val(
+            parsed_ip.get("prefix_length") or parsed_ip.get("prefix")
+        )
+
+        link_status = str(
+            _unwrap_val(
+                parsed_ip.get("link_status")
+                or parsed_ip.get("link_state")
+                or parsed_ip.get("admin_state")
+                or parsed_ip.get("status")
+                or ""
+            )
+        ).lower()
+
+        proto_status = str(
+            _unwrap_val(parsed_ip.get("protocol_status") or "")
+        ).lower()
+
+        if not addr or not prefix:
+            return {"status": "ok", "result": "not_found", "interface": None}
+
+        ipv4_val = f"{str(addr).strip()}/{str(prefix).strip()}"
+
+        if "administratively down" in link_status or "down" in link_status or "down" in proto_status:
+            admin_state = "down"
+        else:
+            admin_state = "up"
+
+        # แกะ Description จาก Fake Runner / TextFSM
+        desc_val = None
+        short_name = interface_name.replace("Loopback", "Lo")
+
+        desc_list = []
+        if isinstance(descriptions, (list, tuple)):
+            desc_list = list(descriptions)
+        elif isinstance(descriptions, dict):
+            desc_list = [descriptions]
+
+        for d in desc_list:
+            if isinstance(d, dict):
+                p_if = str(d.get("interface") or d.get("port") or "").strip()
+                if p_if.lower() in (interface_name.lower(), short_name.lower()):
+                    desc_raw = d.get("description")
+                    if desc_raw is not None and str(desc_raw).strip() != "":
+                        desc_val = str(desc_raw).strip()
+                    break
+
+        return {
+            "status": "ok",
+            "result": "found",
+            "interface": {
+                "name": interface_name,
+                "ipv4": ipv4_val,
+                "description": desc_val,
+                "admin_state": admin_state,
+            },
+        }
+
+    except PermissionError:
+        return {"status": "error", "result": "authentication_failed"}
+    except ConnectionError:
+        return {"status": "error", "result": "connection_failed"}
+    except Exception:
+        return {"status": "error", "result": "backend_failed"}
 
 
 def delete_interface(
@@ -13,4 +119,65 @@ def delete_interface(
     netmiko_delete=None,
 ):
     """Delete an interface using Netmiko."""
-    raise NotImplementedError
+    try:
+        if netmiko_delete is not None:
+            res = netmiko_delete(router, interface_name)
+            if res == "not_found":
+                return {"status": "ok", "result": "not_found", "interface": None}
+            elif res == "deleted":
+                return {"status": "ok", "result": "deleted"}
+            else:
+                return {"status": "error", "result": "backend_failed"}
+        else:
+            username, password = _get_credentials()
+            device = {
+                "device_type": "cisco_ios",
+                "host": router,
+                "username": username,
+                "password": password,
+            }
+            with ConnectHandler(**device) as net_connect:
+                status_res = get_interface_state(
+                    router,
+                    interface_name,
+                    netmiko_get=lambda r, n: (
+                        net_connect.send_command(
+                            f"show ip interface {n}", use_textfsm=True
+                        ),
+                        net_connect.send_command(
+                            "show interfaces description", use_textfsm=True
+                        ),
+                    ),
+                )
+                if status_res.get("result") == "not_found":
+                    return {
+                        "status": "ok",
+                        "result": "not_found",
+                        "interface": None,
+                    }
+
+                net_connect.send_config_set([f"no interface {interface_name}"])
+
+                status_check = get_interface_state(
+                    router,
+                    interface_name,
+                    netmiko_get=lambda r, n: (
+                        net_connect.send_command(
+                            f"show ip interface {n}", use_textfsm=True
+                        ),
+                        net_connect.send_command(
+                            "show interfaces description", use_textfsm=True
+                        ),
+                    ),
+                )
+                if status_check.get("result") == "not_found":
+                    return {"status": "ok", "result": "deleted"}
+                else:
+                    return {"status": "error", "result": "backend_failed"}
+
+    except PermissionError:
+        return {"status": "error", "result": "authentication_failed"}
+    except ConnectionError:
+        return {"status": "error", "result": "connection_failed"}
+    except Exception:
+        return {"status": "error", "result": "backend_failed"}
