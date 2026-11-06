@@ -7,7 +7,6 @@
   tasks:
     - name: Configure Loopback Interface State
       cisco.ios.ios_config:
-        defaults: true
         lines:
           - "description {{ description }}"
           - "ip address {{ ipv4_address }} {{ netmask }}"
