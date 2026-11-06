@@ -12,3 +12,4 @@
           - "ip address {{ ipv4_address }} {{ netmask }}"
           - "{{ 'shutdown' if shutdown else 'no shutdown' }}"
         parents: "interface {{ interface_name }}"
+        defaults: true
