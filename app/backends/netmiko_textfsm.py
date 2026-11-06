@@ -51,13 +51,19 @@ def get_interface_state(
             parsed_ip.get("prefix_length") or parsed_ip.get("prefix")
         )
 
-        link_state_raw = str(
+        # ตรวจสอบสถานะการทำงานจาก TextFSM fields
+        link_status = str(
             _unwrap_val(
-                parsed_ip.get("link_state")
+                parsed_ip.get("link_status")
+                or parsed_ip.get("link_state")
                 or parsed_ip.get("admin_state")
                 or parsed_ip.get("status")
                 or ""
             )
+        ).lower()
+
+        proto_status = str(
+            _unwrap_val(parsed_ip.get("protocol_status") or "")
         ).lower()
 
         if not addr or not prefix:
@@ -65,21 +71,23 @@ def get_interface_state(
 
         ipv4_val = f"{str(addr).strip()}/{str(prefix).strip()}"
 
-        if "administratively down" in link_state_raw or "down" in link_state_raw:
+        if "administratively down" in link_status or "down" in link_status or "down" in proto_status:
             admin_state = "down"
         else:
             admin_state = "up"
 
+        # ค้นหา description โดยเปรียบเทียบชื่อ Interface ทั้งแบบเต็มและแบบย่อ
         desc_val = None
         short_name = interface_name.replace("Loopback", "Lo")
+        
         if isinstance(descriptions, list):
             for d in descriptions:
                 if isinstance(d, dict):
-                    p_if = d.get("interface", "")
-                    if p_if in (interface_name, short_name):
-                        desc_val = d.get("description")
-                        if desc_val == "":
-                            desc_val = None
+                    p_if = str(d.get("interface", "")).strip()
+                    if p_if.lower() in (interface_name.lower(), short_name.lower()):
+                        desc_raw = d.get("description")
+                        if desc_raw is not None and str(desc_raw).strip() != "":
+                            desc_val = str(desc_raw).strip()
                         break
 
         return {
@@ -169,4 +177,3 @@ def delete_interface(
         return {"status": "error", "result": "connection_failed"}
     except Exception:
         return {"status": "error", "result": "backend_failed"}
-    

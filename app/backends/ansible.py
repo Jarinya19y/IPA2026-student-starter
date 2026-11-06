@@ -18,6 +18,9 @@ def apply_interface(
     else:
         ipv4_addr, prefix_len, netmask = desired_ipv4, "", ""
 
+    admin_state = desired_interface.get("admin_state", "up")
+    shutdown_flag = admin_state == "down"
+
     variables = {
         "router": router,
         "interface_name": desired_interface["name"],
@@ -26,7 +29,8 @@ def apply_interface(
         "ipv4_prefix_len": prefix_len,
         "netmask": netmask,
         "description": desired_interface["description"],
-        "admin_state": desired_interface["admin_state"],
+        "admin_state": admin_state,
+        "shutdown": shutdown_flag,
         "ansible_user": username,
         "ansible_password": password,
     }
