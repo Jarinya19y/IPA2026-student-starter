@@ -9,7 +9,7 @@ def _get_credentials():
 
 
 def _unwrap_val(val):
-    if isinstance(val, list):
+    if isinstance(val, (list, tuple)):
         return val[0] if len(val) > 0 else ""
     return val if val is not None else ""
 
@@ -43,7 +43,7 @@ def get_interface_state(
             return {"status": "ok", "result": "not_found", "interface": None}
 
         parsed_ip = (
-            ip_info[0] if isinstance(ip_info, list) and len(ip_info) > 0 else {}
+            ip_info[0] if isinstance(ip_info, (list, tuple)) and len(ip_info) > 0 else (ip_info if isinstance(ip_info, dict) else {})
         )
 
         addr = _unwrap_val(parsed_ip.get("ip_address") or parsed_ip.get("ip"))
@@ -51,7 +51,6 @@ def get_interface_state(
             parsed_ip.get("prefix_length") or parsed_ip.get("prefix")
         )
 
-        # ตรวจสอบสถานะการทำงานจาก TextFSM fields
         link_status = str(
             _unwrap_val(
                 parsed_ip.get("link_status")
@@ -76,19 +75,24 @@ def get_interface_state(
         else:
             admin_state = "up"
 
-        # ค้นหา description โดยเปรียบเทียบชื่อ Interface ทั้งแบบเต็มและแบบย่อ
+        # แกะ Description จาก Fake Runner / TextFSM
         desc_val = None
         short_name = interface_name.replace("Loopback", "Lo")
-        
-        if isinstance(descriptions, list):
-            for d in descriptions:
-                if isinstance(d, dict):
-                    p_if = str(d.get("interface", "")).strip()
-                    if p_if.lower() in (interface_name.lower(), short_name.lower()):
-                        desc_raw = d.get("description")
-                        if desc_raw is not None and str(desc_raw).strip() != "":
-                            desc_val = str(desc_raw).strip()
-                        break
+
+        desc_list = []
+        if isinstance(descriptions, (list, tuple)):
+            desc_list = list(descriptions)
+        elif isinstance(descriptions, dict):
+            desc_list = [descriptions]
+
+        for d in desc_list:
+            if isinstance(d, dict):
+                p_if = str(d.get("interface") or d.get("port") or "").strip()
+                if p_if.lower() in (interface_name.lower(), short_name.lower()):
+                    desc_raw = d.get("description")
+                    if desc_raw is not None and str(desc_raw).strip() != "":
+                        desc_val = str(desc_raw).strip()
+                    break
 
         return {
             "status": "ok",
