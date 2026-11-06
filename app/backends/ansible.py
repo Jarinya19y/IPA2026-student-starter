@@ -1,5 +1,64 @@
+import json
 import os
-import ipaddress
+import subprocess
+import tempfile
+from ipaddress import IPv4Interface
+from pathlib import Path
+
+
+ANSIBLE_DIR = Path(__file__).resolve().parents[2] / "ansible"
+
+
+def error(code):
+    return {"status": "error", "result": code}
+
+
+def _real_run_playbook(variables):
+    """รัน ansible-playbook จริงโดยแมปตัวแปรตรงกับ apply_interface.yml"""
+    extra = dict(
+        variables,
+        ansible_host=variables["router"],
+        target=variables["router"],
+    )
+
+    with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as f:
+        json.dump(extra, f)
+        vars_file = f.name
+
+    env = dict(
+        os.environ,
+        ANSIBLE_HOST_KEY_CHECKING="False",
+        ANSIBLE_PERSISTENT_COMMAND_TIMEOUT="12",
+        ANSIBLE_PERSISTENT_CONNECT_TIMEOUT="12",
+    )
+    try:
+        proc = subprocess.run(
+            [
+                "ansible-playbook",
+                "-i", str(ANSIBLE_DIR / "inventory.ini"),
+                str(ANSIBLE_DIR / "apply_interface.yml"),
+                "-e", f"@{vars_file}",
+            ],
+            capture_output=True,
+            text=True,
+            env=env,
+            timeout=18,
+        )
+    except subprocess.TimeoutExpired:
+        raise ConnectionError("ansible-playbook timed out")
+    finally:
+        if os.path.exists(vars_file):
+            os.unlink(vars_file)
+
+    if proc.returncode == 0:
+        return
+
+    output = (proc.stdout + proc.stderr).lower()
+    if "authentication" in output or "permission denied" in output:
+        raise PermissionError("authentication failed")
+    if "unreachable" in output or "timed out" in output or "timeout" in output:
+        raise ConnectionError("router unreachable")
+    raise RuntimeError("playbook failed")
 
 
 def apply_interface(
@@ -8,50 +67,28 @@ def apply_interface(
     run_playbook=None,
 ):
     """Apply complete desired interface state using Ansible."""
-    username = os.getenv("ROUTER_USER")
-    password = os.getenv("ROUTER_PASS")
-
-    desired_ipv4 = desired_interface.get("ipv4", "")
-    if "/" in desired_ipv4:
-        ipv4_addr, prefix_len = desired_ipv4.split("/", 1)
-        netmask = str(ipaddress.IPv4Network(f"0.0.0.0/{prefix_len}").netmask)
-    else:
-        ipv4_addr, prefix_len, netmask = desired_ipv4, "", ""
+    if run_playbook is None:
+        run_playbook = _real_run_playbook
 
     admin_state = desired_interface.get("admin_state", "up")
-    shutdown_flag = admin_state == "down"
+    ipv4 = IPv4Interface(desired_interface["ipv4"])
 
     variables = {
         "router": router,
         "interface_name": desired_interface["name"],
-        "ipv4": desired_ipv4,
-        "ipv4_address": ipv4_addr,
-        "ipv4_prefix_len": prefix_len,
-        "netmask": netmask,
         "description": desired_interface["description"],
-        "admin_state": admin_state,
-        "shutdown": shutdown_flag,
-        "ansible_user": username,
-        "ansible_password": password,
+        "ipv4_address": str(ipv4.ip),
+        "netmask": str(ipv4.netmask),
+        "shutdown": admin_state == "down",
     }
 
     try:
-        if run_playbook is not None:
-            run_playbook(variables)
-        else:
-            import ansible_runner
-
-            res = ansible_runner.run(
-                playbook="ansible/playbook.yaml", extravars=variables
-            )
-            if res.rc != 0:
-                return {"status": "error", "result": "backend_failed"}
-
-        return {"status": "ok", "result": "applied"}
-
+        run_playbook(variables)
     except PermissionError:
-        return {"status": "error", "result": "authentication_failed"}
-    except ConnectionError:
-        return {"status": "error", "result": "connection_failed"}
+        return error("authentication_failed")
+    except (ConnectionError, TimeoutError):
+        return error("connection_failed")
     except Exception:
-        return {"status": "error", "result": "backend_failed"}
+        return error("backend_failed")
+
+    return {"status": "ok", "result": "applied"}
