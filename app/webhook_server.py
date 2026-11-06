@@ -77,7 +77,7 @@ class WebexEventHandler:
                 with open(tmp_path, "wb") as f:
                     f.write(content)
                 res = self.processor(
-                    mentioned_people, str(tmp_path), self.bot_person_id
+                    mentioned_people, tmp_path, self.bot_person_id
                 )
             except Exception as e:
                 logger.error(f"Error processing attachment: {e}")
