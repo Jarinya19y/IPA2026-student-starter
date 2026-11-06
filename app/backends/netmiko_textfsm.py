@@ -6,6 +6,11 @@ def _get_auth():
     password = os.getenv("ROUTER_PASS")
     return (username, password)
 
+def _unwrap_val(val):
+    if isinstance(val, list):
+        return val[0] if len(val) > 0 else ""
+    return val if val is not None else ""
+
 def get_interface_state(
     router,
     interface_name,
@@ -34,26 +39,42 @@ def get_interface_state(
         if not ip_info:
             return {"status": "ok", "result": "not_found", "interface": None}
 
-        parsed_ip = ip_info[0] if isinstance(ip_info, list) and len(ip_info) > 0 else {}
-        
-        addr = parsed_ip.get("ip_address") or parsed_ip.get("ip")
-        prefix = parsed_ip.get("prefix_length") or parsed_ip.get("prefix")
-        link_state = parsed_ip.get("link_state") or parsed_ip.get("admin_state", "")
+        parsed_ip = (
+            ip_info[0] if isinstance(ip_info, list) and len(ip_info) > 0 else {}
+        )
+
+        addr = _unwrap_val(parsed_ip.get("ip_address") or parsed_ip.get("ip"))
+        prefix = _unwrap_val(
+            parsed_ip.get("prefix_length") or parsed_ip.get("prefix")
+        )
+
+        link_state_val = _unwrap_val(
+            parsed_ip.get("link_state")
+            or parsed_ip.get("admin_state")
+            or parsed_ip.get("status")
+            or ""
+        )
 
         if not addr or not prefix:
             return {"status": "ok", "result": "not_found", "interface": None}
 
-        ipv4_val = f"{addr}/{prefix}"
-        admin_state = "down" if "administratively down" in str(link_state).lower() else "up"
+        ipv4_val = f"{str(addr).strip()}/{str(prefix).strip()}"
+
+        link_str = str(link_state_val).lower()
+        if "down" in link_str or "administratively down" in link_str:
+            admin_state = "down"
+        else:
+            admin_state = "up"
 
         desc_val = None
         short_name = interface_name.replace("Loopback", "Lo")
-        for d in descriptions:
-            if isinstance(d, dict):
-                p_if = d.get("interface", "")
-                if p_if in (interface_name, short_name):
-                    desc_val = d.get("description")
-                    break
+        if isinstance(descriptions, list):
+            for d in descriptions:
+                if isinstance(d, dict):
+                    p_if = d.get("interface", "")
+                    if p_if in (interface_name, short_name):
+                        desc_val = d.get("description")
+                        break
 
         return {
             "status": "ok",
@@ -98,22 +119,39 @@ def delete_interface(
                 "password": password,
             }
             with ConnectHandler(**device) as net_connect:
-                # 1. เช็กสถานะก่อน
-                status_res = get_interface_state(router, interface_name, netmiko_get=lambda r, n: (
-                    net_connect.send_command(f"show ip interface {n}", use_textfsm=True),
-                    net_connect.send_command("show interfaces description", use_textfsm=True)
-                ))
+                status_res = get_interface_state(
+                    router,
+                    interface_name,
+                    netmiko_get=lambda r, n: (
+                        net_connect.send_command(
+                            f"show ip interface {n}", use_textfsm=True
+                        ),
+                        net_connect.send_command(
+                            "show interfaces description", use_textfsm=True
+                        ),
+                    ),
+                )
                 if status_res.get("result") == "not_found":
-                    return {"status": "ok", "result": "not_found", "interface": None}
+                    return {
+                        "status": "ok",
+                        "result": "not_found",
+                        "interface": None,
+                    }
 
-                # 2. ลบ interface
                 net_connect.send_config_set([f"no interface {interface_name}"])
 
-                # 3. ตรวจสอบอีกครั้ง
-                status_check = get_interface_state(router, interface_name, netmiko_get=lambda r, n: (
-                    net_connect.send_command(f"show ip interface {n}", use_textfsm=True),
-                    net_connect.send_command("show interfaces description", use_textfsm=True)
-                ))
+                status_check = get_interface_state(
+                    router,
+                    interface_name,
+                    netmiko_get=lambda r, n: (
+                        net_connect.send_command(
+                            f"show ip interface {n}", use_textfsm=True
+                        ),
+                        net_connect.send_command(
+                            "show interfaces description", use_textfsm=True
+                        ),
+                    ),
+                )
                 if status_check.get("result") == "not_found":
                     return {"status": "ok", "result": "deleted"}
                 else:

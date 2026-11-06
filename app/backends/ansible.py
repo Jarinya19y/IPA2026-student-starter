@@ -9,10 +9,18 @@ def apply_interface(
     username = os.getenv("ROUTER_USER", "admin")
     password = os.getenv("ROUTER_PASS", "cisco")
 
+    desired_ipv4 = desired_interface.get("ipv4", "")
+    if "/" in desired_ipv4:
+        ipv4_addr, prefix_len = desired_ipv4.split("/", 1)
+    else:
+        ipv4_addr, prefix_len = desired_ipv4, ""
+
     variables = {
         "router": router,
         "interface_name": desired_interface["name"],
-        "ipv4": desired_interface["ipv4"],
+        "ipv4": desired_ipv4,
+        "ipv4_address": ipv4_addr,
+        "ipv4_prefix_len": prefix_len,
         "description": desired_interface["description"],
         "admin_state": desired_interface["admin_state"],
         "ansible_user": username,
@@ -24,9 +32,9 @@ def apply_interface(
             run_playbook(variables)
         else:
             import ansible_runner
+
             res = ansible_runner.run(
-                playbook='ansible/playbook.yaml',
-                extravars=variables
+                playbook="ansible/playbook.yaml", extravars=variables
             )
             if res.rc != 0:
                 return {"status": "error", "result": "backend_failed"}
