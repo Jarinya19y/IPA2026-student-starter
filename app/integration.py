@@ -4,6 +4,7 @@ from app.core import process_request_file
 from app.dispatcher import dispatch_request
 from app.request_handler import validate_webex_envelope
 
+
 def process_request(mentioned_people, attachment_path, bot_person_id):
     # TODO: implement according to Part 4 specification
     envelope_error = validate_webex_envelope(

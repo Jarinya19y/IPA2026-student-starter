@@ -5,7 +5,6 @@ import tempfile
 from ipaddress import IPv4Interface
 from pathlib import Path
 
-
 ANSIBLE_DIR = Path(__file__).resolve().parents[2] / "ansible"
 
 
@@ -35,9 +34,11 @@ def _real_run_playbook(variables):
         proc = subprocess.run(
             [
                 "ansible-playbook",
-                "-i", str(ANSIBLE_DIR / "inventory.ini"),
+                "-i",
+                str(ANSIBLE_DIR / "inventory.ini"),
                 str(ANSIBLE_DIR / "apply_interface.yml"),
-                "-e", f"@{vars_file}",
+                "-e",
+                f"@{vars_file}",
             ],
             capture_output=True,
             text=True,

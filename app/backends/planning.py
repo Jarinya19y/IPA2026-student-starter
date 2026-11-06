@@ -1,5 +1,6 @@
 from app.planner import build_plan
 
+
 def plan_interface(
     router,
     desired_interface,

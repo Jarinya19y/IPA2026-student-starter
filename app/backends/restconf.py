@@ -3,13 +3,16 @@ import requests
 import os
 from .planning import plan_interface as generic_plan_interface
 
+
 def _convert_mask_to_cidr(netmask):
     return "/" + str(ipaddress.IPv4Network(f"0.0.0.0/{netmask}").prefixlen)
+
 
 def _get_auth():
     username = os.getenv("ROUTER_USER")
     password = os.getenv("ROUTER_PASS")
     return (username, password)
+
 
 def get_interface_state(
     router,
@@ -18,8 +21,11 @@ def get_interface_state(
 ):
     """Return normalized interface status using RESTCONF."""
 
-    url = f"https://{router}/restconf/data/ietf-interfaces:interfaces/interface={interface_name}"
-    
+    url = (
+        f"https://{router}/restconf/data/"
+        f"ietf-interfaces:interfaces/interface={interface_name}"
+    )
+
     try:
         if http_get is not None:
             res = http_get(url)
@@ -31,7 +37,7 @@ def get_interface_state(
                 verify=False,
                 timeout=10,
             )
-        
+
         status_code = getattr(res, "status_code", None)
         if status_code == 404:
             return {"status": "ok", "result": "not_found", "interface": None}
@@ -56,7 +62,7 @@ def get_interface_state(
         ipv4_info = if_data.get("ietf-ip:ipv4", {}).get("address", [])
         if not ipv4_info:
             ipv4_info = if_data.get("ipv4", {}).get("address", [])
-            
+
         ipv4_val = None
         if ipv4_info and isinstance(ipv4_info, list) and len(ipv4_info) > 0:
             addr = ipv4_info[0].get("ip")
@@ -108,7 +114,10 @@ def apply_interface(
     """Apply complete desired interface state using RESTCONF."""
     raw_name = desired_interface["name"]
     loopback_id = raw_name.replace("Loopback", "")
-    url = f"https://{router}/restconf/data/Cisco-IOS-XE-native:native/interface/Loopback={loopback_id}"
+    url = (
+        f"https://{router}/restconf/data/"
+        f"Cisco-IOS-XE-native:native/interface/Loopback={loopback_id}"
+    )
 
     ip_obj = ipaddress.IPv4Network(desired_interface["ipv4"], strict=False)
     ip_addr = str(ip_obj.network_address)

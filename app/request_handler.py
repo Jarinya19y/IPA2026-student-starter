@@ -1,5 +1,6 @@
 from .core import process_request_file
 
+
 def validate_webex_envelope(
     mentioned_people,
     attachment_path,
@@ -10,7 +11,7 @@ def validate_webex_envelope(
     Return an error response, or None when the envelope is valid.
     """
     # TODO: implement according to the published specifications
-    # 1. bot_person_id ต้องไม่เป็นค่าว่าง/None และ mentioned_people (list) ต้องมี bot_person_id อยู่
+    # 1. bot_person_id
     if (
         not bot_person_id
         or not isinstance(bot_person_id, str)

@@ -15,6 +15,7 @@ METHODS_AND_ACTIONS = {
     "netmiko-textfsm": ["status", "delete"],
 }
 
+
 def validate_request(data):
     """
     Validate one IPA2026 desired-state request.
@@ -24,17 +25,21 @@ def validate_request(data):
     """
     # TODO: implement
     # 1. version
-    # A missing version or any other type/value returns invalid_version. 
+    # A missing version or any other type/value returns invalid_version.
     if "version" not in data or data["version"] is None:
         return {"status": "error", "result": "invalid_version"}
-    
+
     # it must be the YAML integer 1.
     # In particular, "1" (string), 1.0 (float), and true (boolean) are invalid.
     version = data["version"]
-    if isinstance(version, bool) or not isinstance(version, int) or version != 1:
+    if (
+        isinstance(version, bool)
+        or not isinstance(version, int)
+        or version != 1
+    ):
         return {"status": "error", "result": "invalid_version"}
 
-    # 2. router: 
+    # 2. router:
     # missing_router
     if "router" not in data or data["router"] is None:
         return {"status": "error", "result": "missing_router"}
@@ -43,40 +48,53 @@ def validate_request(data):
         return {"status": "error", "result": "invalid_router"}
 
     # 3. method:
-    # missing_method 
+    # missing_method
     if "method" not in data or data["method"] is None:
-            return {"status": "error", "result": "missing_method"}
+        return {"status": "error", "result": "missing_method"}
     # , then invalid_method if unknown.
     method = data["method"]
     if method not in METHODS_AND_ACTIONS:
         return {"status": "error", "result": "invalid_method"}
 
-    # 4. action: 
-    # missing_action 
+    # 4. action:
+    # missing_action
     if "action" not in data or data["action"] is None:
-            return {"status": "error", "result": "missing_action"}
+        return {"status": "error", "result": "missing_action"}
     # invalid_action if unsupported by the selected method.
     action = data["action"]
     if action not in METHODS_AND_ACTIONS[method]:
         return {"status": "error", "result": "invalid_action"}
 
-    # 5. desired: 
-    # desired:  missing_desired, 
+    # 5. desired:
+    # desired:  missing_desired,
     if "desired" not in data or data["desired"] is None:
         return {"status": "error", "result": "missing_desired"}
     # desired.interface:  missing_interface
     desired = data["desired"]
-    if not isinstance(desired, dict) or "interface" not in desired or desired["interface"] is None:
+    if (
+        not isinstance(desired, dict)
+        or "interface" not in desired
+        or desired["interface"] is None
+    ):
         return {"status": "error", "result": "missing_interface"}
     # desired.interface.name:  missing_interface_name
     interface = desired["interface"]
-    if not isinstance(interface, dict) or "name" not in interface or not interface["name"] or str(interface["name"]).strip() == "":
+    if (
+        not isinstance(interface, dict)
+        or "name" not in interface
+        or not interface["name"]
+        or str(interface["name"]).strip() == ""
+    ):
         return {"status": "error", "result": "missing_interface_name"}
 
-    # 6. For plan and apply only: 
+    # 6. For plan and apply only:
     if action in ("plan", "apply"):
         # missing_ipv4
-        if "ipv4" not in interface or not interface["ipv4"] or str(interface["ipv4"]).strip() == "":
+        if (
+            "ipv4" not in interface
+            or not interface["ipv4"]
+            or str(interface["ipv4"]).strip() == ""
+        ):
             return {"status": "error", "result": "missing_ipv4"}
         # missing_description
         if "description" not in interface or interface["description"] is None:
@@ -101,10 +119,10 @@ def process_request_file(path):
     try:
         with open(path, "r", encoding="utf-8") as f:
             data = yaml.safe_load(f)
-            
+
         if not isinstance(data, dict):
             return {"status": "error", "result": "invalid_yaml"}
-            
+
     except Exception:
         return {"status": "error", "result": "invalid_yaml"}
 

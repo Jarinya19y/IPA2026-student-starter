@@ -49,12 +49,13 @@ def get_interface_state(
                 except Exception:
                     descriptions = []
 
-        # ถ้า ip_info เป็น string (ไม่ผ่าน TextFSM) หรือเป็น list ว่าง แสดงว่าไม่พบ interface
         if not isinstance(ip_info, (list, tuple, dict)) or not ip_info:
             return {"status": "ok", "result": "not_found", "interface": None}
 
         parsed_ip = (
-            ip_info[0] if isinstance(ip_info, (list, tuple)) and len(ip_info) > 0 else (ip_info if isinstance(ip_info, dict) else {})
+            ip_info[0]
+            if isinstance(ip_info, (list, tuple)) and len(ip_info) > 0
+            else (ip_info if isinstance(ip_info, dict) else {})
         )
 
         addr = _unwrap_val(parsed_ip.get("ip_address") or parsed_ip.get("ip"))
@@ -81,7 +82,11 @@ def get_interface_state(
 
         ipv4_val = f"{str(addr).strip()}/{str(prefix).strip()}"
 
-        if "administratively down" in link_status or "down" in link_status or "down" in proto_status:
+        if (
+            "administratively down" in link_status
+            or "down" in link_status
+            or "down" in proto_status
+        ):
             admin_state = "down"
         else:
             admin_state = "up"
@@ -98,7 +103,10 @@ def get_interface_state(
         for d in desc_list:
             if isinstance(d, dict):
                 p_if = str(d.get("interface") or d.get("port") or "").strip()
-                if p_if.lower() in (interface_name.lower(), short_name.lower()):
+                if p_if.lower() in (
+                    interface_name.lower(),
+                    short_name.lower(),
+                ):
                     desc_raw = d.get("description")
                     if desc_raw is not None and str(desc_raw).strip() != "":
                         desc_val = str(desc_raw).strip()
@@ -134,7 +142,11 @@ def delete_interface(
         if netmiko_delete is not None:
             res = netmiko_delete(router, interface_name)
             if res == "not_found":
-                return {"status": "ok", "result": "not_found", "interface": None}
+                return {
+                    "status": "ok",
+                    "result": "not_found",
+                    "interface": None,
+                }
             elif res == "deleted":
                 return {"status": "ok", "result": "deleted"}
             else:
@@ -170,7 +182,6 @@ def delete_interface(
                     netmiko_get=safe_get,
                 )
 
-                # ถ้าไม่มี Interface ตั้งแต่แรก ให้คืนค่า not_found (รองรับข้อ 10)
                 if status_res.get("result") == "not_found":
                     return {
                         "status": "ok",

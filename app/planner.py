@@ -23,7 +23,7 @@ def build_plan(desired_interface, current_interface):
     for field in managed_fields:
         desired_val = desired_interface.get(field)
         current_val = current_interface.get(field)
-        
+
         # บันทึกความเปลี่ยนแปลงหากค่าในฟิลด์ไม่ตรงกัน
         if desired_val != current_val:
             changes[field] = {
@@ -31,12 +31,12 @@ def build_plan(desired_interface, current_interface):
                 "to": desired_val,
             }
 
-    # Use update when the interface exists and 
+    # Use update when the interface exists and
     # at least one managed field differs from the desired state.
     if changes:
         operation = "update"
     # Use no_change when all managed fields already match the desired state.
-    else: 
+    else:
         operation = "no_change"
 
     return {

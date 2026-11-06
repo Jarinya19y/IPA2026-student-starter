@@ -4,7 +4,8 @@ import os
 
 import requests
 
-WEBEX_API_BASE = 'https://webexapis.com/v1'
+WEBEX_API_BASE = "https://webexapis.com/v1"
+
 
 class WebexClient:
     def __init__(self, token=None, session=None):
